@@ -1,0 +1,27 @@
+name: Sync fork from upstream
+
+on:
+  schedule:
+    - cron: "7 */4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out fork
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Sync from upstream
+        run: |
+          git remote add upstream https://github.com/xiaoyang111222/cn-math-taxonomy.git
+          git fetch upstream main
+          git merge --ff-only upstream/main
+          git push origin main
