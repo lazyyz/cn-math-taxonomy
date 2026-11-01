@@ -23,5 +23,5 @@ jobs:
         run: |
           git remote add upstream https://github.com/xiaoyang111222/cn-math-taxonomy.git
           git fetch upstream main
-          git merge --ff-only upstream/main
+          git merge --no-edit upstream/main
           git push origin main
