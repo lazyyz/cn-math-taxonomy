@@ -1055,6 +1055,16 @@ test('题库：初中生物有内联结构示意图', () => {
   });
 });
 
+test('题库：初中地理有内联示意图', () => {
+  const geo = questions.filter((q) => String(q.topicId || '').startsWith('cng_') && q.figure);
+  assert.ok(geo.length >= 35 && geo.length <= 50, '地理配图题数 ' + geo.length);
+  ['cng_j001_q3', 'cng_j005_q3', 'cng_j034_q1'].forEach((id) => {
+    const q = questions.find((item) => item.id === id);
+    assert.ok(q && q.figure && q.figure.indexOf('currentColor') > 0, id);
+    assert.ok(q.figure.indexOf('viewBox=') > 0, id);
+  });
+});
+
 test('题库：choice 题有 3–4 个选项、key 不重复、answer 是某个选项的 key', () => {
   let n = 0;
   questions.filter((q) => q.type === 'choice').forEach((q) => {
@@ -1471,6 +1481,19 @@ test('gradeTargets：一年级 = 一上 + 一下，七上只含七上；写法�
   assert.strictEqual(g7bioYear.ids.length, 40);
   assert.ok(g7bioYear.ids.every((id) => id.startsWith('cnb_') && RGQ.byId[id].grade === 7));
   assert.strictEqual(E.subjectOf(RGQ.byId[g7bio.ids[0]]), 'biology');
+  const g9chem = E.gradeTargets(RGQ, '九上', 'chemistry');
+  assert.strictEqual(g9chem.ids.length, 27);
+  assert.ok(g9chem.ids.every((id) => id.startsWith('cnk_')));
+  const g9chemDown = E.gradeTargets(RGQ, '九下', 'chemistry');
+  assert.strictEqual(g9chemDown.ids.length, 18);
+  assert.ok(g9chemDown.ids.every((id) => id.startsWith('cnk_') && RGQ.byId[id].grade === 9 && RGQ.byId[id].semester === '下'));
+  assert.strictEqual(E.gradeTargets(RGQ, '八上', 'chemistry'), null);
+  assert.strictEqual(E.gradeTargets(RGQ, '七上', 'chemistry'), null);
+  const g9chemYear = E.gradeTargets(RGQ, '九年级', 'chemistry');
+  assert.strictEqual(g9chemYear.ids.length, 45);
+  assert.ok(g9chemYear.ids.every((id) => id.startsWith('cnk_') && RGQ.byId[id].grade === 9));
+  assert.strictEqual(E.subjectOf(RGQ.byId[g9chem.ids[0]]), 'chemistry');
+  assert.ok(E.gradeTargets(RGQ, '九上').ids.every((id) => id.startsWith('cnm_')));
   const g7 = E.gradeTargets(RGQ, '七年级');
   assert.strictEqual(g7.ids.length, formal.filter((t) => t.grade === 7 && String(t.id).startsWith('cnm_')).length);
   assert.ok(g7.ids.every((id) => id.startsWith('cnm_')));
