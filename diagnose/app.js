@@ -195,8 +195,8 @@
       if (volSel === '全') volSel = '';
     }
     if (subject === 'morality') {
-      document.title = '诊断 · 小学道德与法治';
-      if ('一二三四五六'.indexOf(gradeSel) < 0) gradeSel = '一';
+      document.title = '诊断 · 道德与法治';
+      if ('一二三四五六七八九'.indexOf(gradeSel) < 0) gradeSel = '一';
       if (volSel === '全') volSel = '';
     }
     if (subject === 'history') {
@@ -262,7 +262,7 @@
     pathTipLock = false;
     if (pathCy) { pathCy.destroy(); pathCy = null; window.__pathCy = null; }
   }
-  function show(node) { teardownPath(); closeShare(); clearRoot(); root.append(node); window.scrollTo(0, 0); }
+  function show(node, keepScroll) { teardownPath(); closeShare(); clearRoot(); root.append(node); if (!keepScroll) window.scrollTo(0, 0); }
   function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
   function theme() {
     return {
@@ -646,8 +646,8 @@
       h('div', { class: 'stage-tabs', role: 'tablist', 'aria-label': '学段' },
         subject === 'physics' ? [stageButton('', '全部'), stageButton('j', '初中'), stageButton('h', '高中')]
           : subject === 'history' || subject === 'geography' || subject === 'biology' || subject === 'chemistry' ? [stageButton('', '全部'), stageButton('j', '初中')]
-          : subject === 'chinese' ? [stageButton('', '全部'), stageButton('p', '小学'), stageButton('j', '初中')]
-          : subject === 'science' || subject === 'morality' ? [stageButton('', '全部'), stageButton('p', '小学')]
+          : subject === 'chinese' || subject === 'morality' ? [stageButton('', '全部'), stageButton('p', '小学'), stageButton('j', '初中')]
+          : subject === 'science' ? [stageButton('', '全部'), stageButton('p', '小学')]
           : [stageButton('', '全部'), stageButton('p', '小学'), stageButton('j', '初中'), stageButton('h', '高中')]),
       h('input', {
         type: 'search', class: 'search-lg', id: 'search',
@@ -727,8 +727,13 @@
           ? [['九', '九年级']]
           : subject === 'chinese'
           ? '一二三四五六七八九'.split('').map(function (x) { return [x, x + '年级']; })
-          : subject === 'science' || subject === 'morality'
+          : subject === 'science'
           ? '一二三四五六'.split('').map(function (x) { return [x, x + '年级']; })
+          : subject === 'morality'
+          ? '一二三四五六七八九'.split('').filter(function (x) {
+            var gnum = '一二三四五六七八九'.indexOf(x) + 1;
+            return D.topics.some(function (t) { return t.grade === gnum; });
+          }).map(function (x) { return [x, x + '年级']; })
           : GRADES.map(function (x) { return [x, x + '年级']; }).concat([
             ['高一', '高一'], ['高二', '高二'], ['选必一', '选必一'], ['选必二', '选必二'], ['选必三', '选必三']
           ]), gradeSel, function (v) {
@@ -745,6 +750,15 @@
             ? tabs('范围', [['全', '全一册']], '全', function () { volSel = '全'; })
           : (subject === 'english' && gradeSel === '九')
             ? tabs('范围', [['', '整年级'], ['上', '上册（新版）'], ['全', '全一册（旧版，九下暂用）']], volSel, function (v) { volSel = v; })
+          : subject === 'morality'
+            ? tabs('范围', [['', '整年级']].concat(['上', '下'].filter(function (sem) {
+              var gnum = '一二三四五六七八九'.indexOf(gradeSel) + 1;
+              return D.topics.some(function (t) { return t.grade === gnum && t.semester === sem; });
+            }).map(function (sem) { return [sem, sem + '册']; })), (function () {
+              var gnum = '一二三四五六七八九'.indexOf(gradeSel) + 1;
+              if (volSel && !D.topics.some(function (t) { return t.grade === gnum && t.semester === volSel; })) volSel = '';
+              return volSel;
+            })(), function (v) { volSel = v; })
             : tabs('范围', [['', '整年级'], ['上', '上册'], ['下', '下册']], volSel, function (v) { volSel = v; }),
         h('p', { class: 'muted', id: 'grade-info' }, g ? g.label + '：' + g.ids.length + ' 个知识点。' : '这个范围没有知识点。'),
         h('div', { class: 'row' },
@@ -893,7 +907,8 @@
     const q = item.question;
     const t = D.graph.byId[id];
     const key = id + '#' + item.attempt;
-    if (ui.key !== key) ui = { key: key, phase: 'ask', answer: '', verdict: null, picked: null };
+    const isNewQuestion = ui.key !== key;
+    if (isNewQuestion) ui = { key: key, phase: 'ask', answer: '', verdict: null, picked: null };
     const n = session.answers.length;
     const card = h('div', { class: 'card' });
     card.append(
@@ -916,6 +931,7 @@
       if (qt) qt.insertAdjacentElement('afterend', stemFig);
     }
 
+    const resultStart = card.children.length;
     if (ui.phase === 'ask') {
       if (q.type === 'choice') {
         card.append(h('div', { class: 'choices' + (q.hideChoiceText ? ' fig-icons' : ''), id: 'choices' }, (q.choices || []).map(function (c) {
@@ -928,7 +944,11 @@
             class: 'choice' + (c.figure ? ' fig-choice' : '') + (ui.picked === c.key ? ' picked' : ''),
             id: 'choice-' + c.key, 'data-key': c.key,
             'aria-label': hideName ? ('选项 ' + c.key) : null,
-            onclick: function () { ui.picked = c.key; ui.answer = c.key; renderQuestion(item); }
+            onclick: function (e) {
+              ui.picked = c.key; ui.answer = c.key;
+              const box = e.currentTarget.parentNode;
+              Array.prototype.forEach.call(box.querySelectorAll('.choice'), function (b) { b.classList.toggle('picked', b.getAttribute('data-key') === c.key); });
+            }
           }, kids);
         })));
       } else if (q.type === 'self') {
@@ -943,7 +963,7 @@
           onkeydown: function (e) { if (e.key === 'Enter' && !e.isComposing) judgeAndGo(item); }
         }));
       }
-      card.append(h('div', { class: 'row', style: 'margin-top:10px' },
+      card.append(h('div', { class: 'row actions-sticky', style: 'margin-top:10px' },
         q.type === 'self' ? null : h('button', { class: 'primary', id: 'btn-submit', onclick: function () { judgeAndGo(item); } }, '提交答案'),
         q.type === 'choice' ? null : h('button', { id: 'btn-peek', onclick: function () { ui.phase = 'self'; ui.verdict = null; renderQuestion(item); } }, '看参考答案并自评'),
         h('button', { id: 'btn-skip', onclick: function () { ui.phase = 'skip'; renderQuestion(item); } }, '不会')));
@@ -953,7 +973,7 @@
         h('div', { class: 'muted' }, '你的答案：' + (q.type === 'choice' ? answerOfKey(q, ui.answer) : ui.answer)),
         h('div', { class: 'verdict ' + (ok ? 'ok' : 'no') }, ok ? '自动判定：正确' : '自动判定：不正确'),
         feedbackBlock(q),
-        h('div', { class: 'row' },
+        h('div', { class: 'row actions-sticky' },
           h('button', { class: 'primary', id: 'btn-next', onclick: function () { commit(ok ? 'correct' : 'wrong'); } }, '下一题'),
           h('button', { id: 'btn-flip', onclick: function () { commit(ok ? 'wrong' : 'correct'); } }, ok ? '判错了，我其实没做对' : '判错了，我其实做对了'),
           h('button', { onclick: function () { ui.phase = 'ask'; renderQuestion(item); } }, '重新作答')));
@@ -961,14 +981,14 @@
       card.append(
         h('div', { class: 'muted' }, '你选择了「不会」。看一下答案和解析再继续：'),
         feedbackBlock(q),
-        h('div', { class: 'row' }, h('button', { class: 'primary', id: 'btn-next', onclick: function () { commit('skip'); } }, '下一题')));
+        h('div', { class: 'row actions-sticky' }, h('button', { class: 'primary', id: 'btn-next', onclick: function () { commit('skip'); } }, '下一题')));
     } else {
       card.append(
-        ui.answer ? h('div', { class: 'muted' }, '你的答案：' + ui.answer) : null,
+        ui.answer ? h('div', { class: 'muted' }, '你的答案：' + ui.answer) : '',
         q.type === 'self' ? h('div', { class: 'muted' }, '开放题：请对照参考答案自己判断。')
-          : (ui.verdict ? h('div', { class: 'muted' }, '这道题的答案无法被自动可靠地判定，请对照参考答案自己判断。') : null),
+          : (ui.verdict ? h('div', { class: 'muted' }, '这道题的答案无法被自动可靠地判定，请对照参考答案自己判断。') : ''),
         feedbackBlock(q),
-        h('div', { class: 'row' },
+        h('div', { class: 'row actions-sticky' },
           h('button', { class: 'good', id: 'btn-right', onclick: function () { commit('correct'); } }, '对（我做对了）'),
           h('button', { class: 'bad', id: 'btn-wrong', onclick: function () { commit('wrong'); } }, '不对'),
           h('button', { id: 'btn-skip2', onclick: function () { commit('skip'); } }, '不会')));
@@ -982,10 +1002,18 @@
     if (demo) page.append(demoBanner());
     page.append(childBar('question'));
     page.append(card);
-    show(page);
+    show(page, !isNewQuestion);
     const inp = document.getElementById('ans');
-    if (inp && inp.setSelectionRange && inp.tagName === 'INPUT') { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
-    else if (inp) inp.focus();
+    const focusOpts = { preventScroll: !isNewQuestion };
+    if (inp && inp.setSelectionRange && inp.tagName === 'INPUT') { inp.focus(focusOpts); inp.setSelectionRange(inp.value.length, inp.value.length); }
+    else if (inp) inp.focus(focusOpts);
+    const resultEl = ui.phase === 'ask' ? null : card.children[resultStart];
+    if (resultEl && !isNewQuestion) {
+      const header = document.querySelector('.site-header');
+      resultEl.style.scrollMarginTop = ((header ? header.offsetHeight : 0) + 12) + 'px';
+      const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      resultEl.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'start' });
+    }
   }
 
   function answerOfKey(q, key) {
@@ -1328,7 +1356,7 @@
         : subject === 'science'
         ? '目标与学习路径上的知识点对应的《义务教育科学课程标准（2022年版）》第一至第三学段学习内容的公开转述。'
         : subject === 'morality'
-        ? '目标与学习路径上的知识点对应的《义务教育道德与法治课程标准（2022年版）》第一至第三学段内容要求的公开转述。'
+        ? '目标与学习路径上的知识点对应的《义务教育道德与法治课程标准（2022年版）》第一至第三学段内容要求的公开转述；初中第四学段目前仅作主题推断，非逐字课标原文，页码待核。只覆盖已录入册次，初中尚未全部覆盖，不含高中。'
         : subject === 'history'
         ? '目标与学习路径上的知识点对应的《义务教育历史课程标准（2022年版）》第四学段内容要求的公开转述。'
         : subject === 'geography'
