@@ -117,10 +117,14 @@ NOTE = {
     "读写": "短文为诊断而写，考查阅读或书面表达要点。册次待核。",
 }
 
-# 七上单元名对照人教社资源页 2026-11-06（Asia/Tokyo）：
-# https://www.pep.com.cn/zslth/yyptzy/czyy/7s/
-# 101–103 是 Starter Unit 1–3；1–7 是 Unit 1–7；90 是未挂到具体单元的待核项。
-# 40 只给已经入库为「七年级下册 第4单元 Eat Well」的食物点占位，避免和七上第 6 单元抢编号。
+# 七上、七下、八上、八下标题已按 2026-11-11 官方阅读器确认；九年级仍是旧版标题。
+# 七上：https://www.pep.com.cn/zslth/yyptzy/czyy/7s/ 与智慧教育平台
+# 人教版2022课标修订官方阅读器（ISBN 978-7-107-38254-3）一致。
+# 七下：智慧教育平台人教版2022课标修订《英语 七年级下册》（ISBN 978-7-107-38255-0）。
+# 八上：智慧教育平台人教版2022课标修订《英语 八年级上册》（ISBN 978-7-107-38944-3）。
+# 八下：智慧教育平台人教版2022课标修订《英语 八年级下册》（阅读器未见印刷书号）。
+# 101–103 是七上 Starter Unit 1–3；正式单元七上到 7，七下、八上、八下到 8；
+# 90 是未挂到具体单元的待核项。九年级仍是旧版 1–14。
 UNITS = {
     (7, "上", 101): "Hello!",
     (7, "上", 102): "Keep Tidy!",
@@ -133,39 +137,33 @@ UNITS = {
     (7, "上", 6): "A Day in the Life",
     (7, "上", 7): "Happy Birthday!",
     (7, "上", 90): "待核",
-    (7, "下", 40): "Eat Well",
-    (7, "下", 1): "Can you play the guitar",
-    (7, "下", 2): "What time do you go to school",
-    (7, "下", 3): "How do you get to school",
-    (7, "下", 4): "Don't eat in class",
-    (7, "下", 5): "Why do you like pandas",
-    (7, "下", 6): "I'm watching TV",
-    (7, "下", 7): "It's raining",
-    (7, "下", 8): "Is there a post office near here",
-    (7, "下", 9): "What does he look like",
-    (7, "下", 10): "I'd like some noodles",
-    (7, "下", 11): "How was your school trip",
-    (7, "下", 12): "What did you do last weekend",
-    (8, "上", 1): "Where did you go on vacation",
-    (8, "上", 2): "How often do you exercise",
-    (8, "上", 3): "I'm more outgoing than my sister",
-    (8, "上", 4): "What's the best movie theater",
-    (8, "上", 5): "Do you want to watch a game show",
-    (8, "上", 6): "I'm going to study computer science",
-    (8, "上", 7): "Will people have robots",
-    (8, "上", 8): "How do you make a banana milk shake",
-    (8, "上", 9): "Can you come to my party",
-    (8, "上", 10): "If you go to the party, you'll have a great time",
-    (8, "下", 1): "What's the matter",
-    (8, "下", 2): "I'll help to clean up the city parks",
-    (8, "下", 3): "Could you please clean your room",
-    (8, "下", 4): "Why don't you talk to your parents",
-    (8, "下", 5): "What were you doing when the rainstorm came",
-    (8, "下", 6): "An old man tried to move the mountains",
-    (8, "下", 7): "What's the highest mountain in the world",
-    (8, "下", 8): "Have you read Treasure Island yet",
-    (8, "下", 9): "Have you ever been to a museum",
-    (8, "下", 10): "I've had this bike for three years",
+    (7, "下", 1): "Animal Friends",
+    (7, "下", 2): "No Rules, No Order",
+    (7, "下", 3): "Keep Fit",
+    (7, "下", 4): "Eat Well",
+    (7, "下", 5): "Here and Now",
+    (7, "下", 6): "Rain or Shine",
+    (7, "下", 7): "A Day to Remember",
+    (7, "下", 8): "Once upon a Time",
+    (7, "下", 90): "待核",
+    (8, "上", 1): "Happy Holiday",
+    (8, "上", 2): "Home Sweet Home",
+    (8, "上", 3): "Same or Different?",
+    (8, "上", 4): "Amazing Plants and Animals",
+    (8, "上", 5): "What a Delicious Meal!",
+    (8, "上", 6): "Plan for Yourself",
+    (8, "上", 7): "When Tomorrow Comes",
+    (8, "上", 8): "Let's Communicate!",
+    (8, "上", 90): "待核",
+    (8, "下", 1): "Time to Relax",
+    (8, "下", 2): "Stay Healthy",
+    (8, "下", 3): "Growing Up",
+    (8, "下", 4): "The Wonders of Nature",
+    (8, "下", 5): "Nature's Temper",
+    (8, "下", 6): "Crossing Cultures",
+    (8, "下", 7): "A Good Read",
+    (8, "下", 8): "Making a Difference",
+    (8, "下", 90): "待核",
     (9, "全", 1): "How can we become good learners",
     (9, "全", 2): "I think that mooncakes are delicious",
     (9, "全", 3): "Could you please tell me where the restrooms are",
@@ -203,8 +201,12 @@ def chapter(grade, sem, unit):
         return "七年级上册 待核"
     if grade == 7 and sem == "上":
         return "七年级上册 第%d单元 %s" % (unit, title)
-    if (grade, sem, unit) == (7, "下", 40):
-        return "七年级下册 第4单元 Eat Well"
+    if grade == 7 and sem == "下" and unit == 90:
+        return "七年级下册 待核"
+    if grade == 8 and sem == "上" and unit == 90:
+        return "八年级上册 待核"
+    if grade == 8 and sem == "下" and unit == 90:
+        return "八年级下册 待核"
     return "%s年级%s册 第%d单元 %s" % (CN[grade], sem, unit, title)
 
 
