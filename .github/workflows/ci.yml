@@ -62,6 +62,9 @@ jobs:
       - name: 错题本存储测试
         run: node tests/test_wrongbook.js
 
+      - name: 期末补漏计划测试
+        run: node tests/test_finals.js
+
       - name: 知识点静态页测试
         run: node tests/test_kp_pages.js
 
@@ -79,3 +82,9 @@ jobs:
 
       - name: 页面脚本缓存测试
         run: node tests/test_pages_script_cache.js
+
+      - name: 数据修补批回归（科学锚定、两道单题、历史诊断题量）
+        run: node tests/test_data_patch_batch.js
+
+      - name: 薄弱科目补强批回归（高中地理、生物、历史与历史先修边）
+        run: node tests/test_senior_batch.js

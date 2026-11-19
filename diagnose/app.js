@@ -200,18 +200,18 @@
       if (volSel === '全') volSel = '';
     }
     if (subject === 'history') {
-      document.title = '诊断 · 初中历史';
-      if ('七八九'.indexOf(gradeSel) < 0) gradeSel = '七';
+      document.title = '诊断 · 历史';
+      if ('七八九'.indexOf(gradeSel) < 0 && !/^(必修[一二]|选必[一二三])$/.test(gradeSel)) gradeSel = '七';
       if (volSel === '全') volSel = '';
     }
     if (subject === 'geography') {
-      document.title = '诊断 · 初中地理';
-      if ('七八'.indexOf(gradeSel) < 0) gradeSel = '七';
+      document.title = '诊断 · 地理';
+      if ('七八'.indexOf(gradeSel) < 0 && !/^(必修[一二]|选必[一二三])$/.test(gradeSel)) gradeSel = '七';
       if (volSel === '全') volSel = '';
     }
     if (subject === 'biology') {
-      document.title = '诊断 · 初中生物';
-      if ('七八'.indexOf(gradeSel) < 0) gradeSel = '七';
+      document.title = '诊断 · 生物';
+      if ('七八'.indexOf(gradeSel) < 0 && !/^(必修[一二]|选必[一二三])$/.test(gradeSel)) gradeSel = '七';
       if (volSel === '全') volSel = '';
     }
     if (subject === 'chemistry') {
@@ -674,8 +674,7 @@
         ? '选一个想学会或想检查的化学知识点。' + confirmHelp
         : '选一个想学会或想检查的知识点。' + confirmHelp),
       h('div', { class: 'stage-tabs', role: 'tablist', 'aria-label': '学段' },
-        subject === 'physics' || subject === 'chemistry' ? [stageButton('', '全部'), stageButton('j', '初中'), stageButton('h', '高中')]
-          : subject === 'history' || subject === 'geography' || subject === 'biology' ? [stageButton('', '全部'), stageButton('j', '初中')]
+        subject === 'physics' || subject === 'chemistry' || subject === 'history' || subject === 'geography' || subject === 'biology' ? [stageButton('', '全部'), stageButton('j', '初中'), stageButton('h', '高中')]
           : subject === 'chinese' || subject === 'morality' ? [stageButton('', '全部'), stageButton('p', '小学'), stageButton('j', '初中')]
           : subject === 'science' ? [stageButton('', '全部'), stageButton('p', '小学')]
           : [stageButton('', '全部'), stageButton('p', '小学'), stageButton('j', '初中'), stageButton('h', '高中')]),
@@ -750,9 +749,9 @@
             ['选必一', '选必一'], ['选必二', '选必二'], ['选必三', '选必三'], ['选必四', '选必四']
           ])
           : subject === 'history'
-          ? '七八九'.split('').map(function (x) { return [x, x + '年级']; })
+          ? '七八九'.split('').map(function (x) { return [x, x + '年级']; }).concat([['必修一', '必修一'], ['必修二', '必修二'], ['选必一', '选必一'], ['选必二', '选必二'], ['选必三', '选必三']])
           : subject === 'geography' || subject === 'biology'
-          ? '七八'.split('').map(function (x) { return [x, x + '年级']; })
+          ? '七八'.split('').map(function (x) { return [x, x + '年级']; }).concat([['必修一', '必修一'], ['必修二', '必修二'], ['选必一', '选必一'], ['选必二', '选必二'], ['选必三', '选必三']])
           : subject === 'chemistry'
           ? [['九', '九年级'], ['必修一', '必修一'], ['必修二', '必修二'], ['选必一', '选必一'], ['选必二', '选必二'], ['选必三', '选必三']]
           : subject === 'chinese'
@@ -830,7 +829,7 @@
       shown += count;
       const openVol = subject === 'physics' ? '八上' : subject === 'english' ? '三上' : subject === 'chemistry' ? '九上' : subject === 'history' || subject === 'geography' || subject === 'biology' ? '七上' : '一上';
       const juniorOpen = subject === 'chemistry' ? '九上' : '七上';
-      const seniorOpen = subject === 'english' || subject === 'physics' || subject === 'chemistry' ? '必修一' : '高一';
+      const seniorOpen = subject === 'english' || subject === 'physics' || subject === 'chemistry' || subject === 'history' || subject === 'geography' || subject === 'biology' ? '必修一' : '高一';
       const det = h('details', { class: 'vol', open: !!q || (startStage === 'j' ? vv[0] === juniorOpen : startStage === 'h' ? vv[0] === seniorOpen : vv[0] === openVol) },
         h('summary', null, vv[1] + '（' + count + ' 个知识点）'));
       chapters.forEach(function (c) {
@@ -1254,6 +1253,10 @@
         stat('ok', sum.mastered.length, '已掌握'),
         stat('unk', sum.untested.length, '未测')),
       sum.unconfirmed.length ? h('p', { class: 'notice' }, '「' + sum.unconfirmed.map(nameOf).join('」「') + '」答错过但还没完成确认就到了题量上限，没来得及复测，暂按薄弱处理。') : null,
+      !screen && !sum.limitReached && sum.asked > 0 && sum.asked < 8
+        ? h('p', { class: 'notice', id: 'short-run-hint' }, '这次只检查了你选的知识点，答对后就结束了，所以只有 ' + sum.asked + ' 题。想按整个年级检查（默认 ' + E.SCREEN_LIMIT + ' 题），请用开始页的「按年级整体诊断」。',
+          h('button', { class: 'no-print', style: 'margin-left:8px', onclick: restart }, '去做整体诊断'))
+        : null,
       sum.limitReached ? h('p', { class: 'notice' }, '已达到题量上限（' + sum.limit + '），剩余没测到的知识点标为「未测」。薄弱根因的先修里若有未测点，真正的根因可能更靠前。',
         session.limit >= 60 ? null : h('button', { class: 'no-print', style: 'margin-left:8px', onclick: function () { rebuild(session.answers, Math.min(session.limit + more, 60)); } }, '再多答 ' + Math.min(more, 60 - session.limit) + ' 题')) : null,
       h('p', { class: 'muted small' }, '自动判题只是近似的，答题记录里可以更正任何一题。生成时间：' + new Date().toLocaleString('zh-CN')),
@@ -1262,6 +1265,7 @@
         h('button', { id: 'btn-export', onclick: exportJson }, '导出 JSON'),
         h('button', { id: 'btn-print', onclick: printPage }, '打印 / 另存为 PDF'),
         wrongbookLink(),
+        h('a', { class: 'btn', id: 'btn-finals', href: '../finals/' + (subject !== 'math' ? '?subject=' + subject : ''), text: '生成我的 7 天补漏计划' }),
         h('button', { onclick: function () { if (confirm('重新开始会清除当前进度，确定吗？')) restart(); } }, '重新开始'),
         session.answers.length ? h('button', { onclick: function () { rebuild(session.answers.slice(0, -1)); } }, '撤销上一题') : null));
     page.append(summaryCard);
@@ -1389,11 +1393,11 @@
         : subject === 'morality'
         ? '目标与学习路径上的知识点对应的《义务教育道德与法治课程标准（2022年版）》第一至第三学段内容要求的公开转述；初中第四学段目前仅作主题推断，非逐字课标原文，页码待核。七至九年级上册已按官方目录录入，九下未建，不含高中。'
         : subject === 'history'
-        ? '目标与学习路径上的知识点对应的《义务教育历史课程标准（2022年版）》第四学段内容要求的公开转述。'
+        ? '目标与学习路径上的知识点对应的《义务教育历史课程标准（2022年版）》第四学段，以及《普通高中历史课程标准（2017年版2020年修订）》必修、选择性必修内容要求的公开转述。'
         : subject === 'geography'
-        ? '目标与学习路径上的知识点对应的《义务教育地理课程标准（2022年版）》第四学段内容要求的公开转述。'
+        ? '目标与学习路径上的知识点对应的《义务教育地理课程标准（2022年版）》第四学段，以及《普通高中地理课程标准（2017年版2020年修订）》必修、选择性必修内容要求的公开转述。'
         : subject === 'biology'
-        ? '目标与学习路径上的知识点对应的《义务教育生物学课程标准（2022年版）》第四学段内容要求的公开转述。'
+        ? '目标与学习路径上的知识点对应的《义务教育生物学课程标准（2022年版）》第四学段，以及《普通高中生物学课程标准（2017年版2020年修订）》必修、选择性必修内容要求的公开转述。'
         : subject === 'chemistry'
         ? '目标与学习路径上的知识点对应的《义务教育化学课程标准（2022年版）》五个学习主题，以及《普通高中化学课程标准（2017年版）》必修第一册、必修第二册、选择性必修第一册、选择性必修第二册、选择性必修第三册相关内容要求的公开转述。'
         : '目标与学习路径上的知识点对应的《义务教育数学课程标准（2022年版）》内容要求（第一至第四学段）。'),
@@ -1450,7 +1454,7 @@
     }
     if (grade >= 1 && grade <= 9) return cn[grade] + '年级';
     if (subject === 'physics') return { 10: '必修一', 11: '必修二', 12: '必修三', 13: '选必一', 14: '选必二', 15: '选必三' }[grade] || ('册' + grade);
-    if (subject === 'chemistry') return { 10: '必修一', 11: '必修二', 12: '选必一', 13: '选必二', 14: '选必三' }[grade] || ('册' + grade);
+    if (subject === 'chemistry' || subject === 'history' || subject === 'geography' || subject === 'biology') return { 10: '必修一', 11: '必修二', 12: '选必一', 13: '选必二', 14: '选必三' }[grade] || ('册' + grade);
     const math = { 10: '高一', 11: '高二', 12: '选必一', 13: '选必二', 14: '选必三' };
     return math[grade] || ('年级' + grade);
   }
@@ -1811,8 +1815,8 @@
             ? '高中英语不拆上下册：' + grade + ' / ' + volume + '（用 grade=必修一 或 grade=选必一）'
             : subject === 'physics'
             ? '高中物理不拆上下册：' + grade + ' / ' + volume + '（用 grade=必修一 或 grade=选必一）'
-            : subject === 'chemistry'
-            ? '高中化学不拆上下册：' + grade + ' / ' + volume + '（用 grade=必修一、grade=必修二、grade=选必一、grade=选必二 或 grade=选必三）'
+            : subject === 'chemistry' || subject === 'history' || subject === 'geography' || subject === 'biology'
+            ? '高中' + (subject === 'chemistry' ? '化学' : subject === 'history' ? '历史' : subject === 'geography' ? '地理' : '生物') + '不拆上下册：' + grade + ' / ' + volume + '（用 grade=必修一、grade=必修二、grade=选必一、grade=选必二 或 grade=选必三）'
             : '高中不拆上下册：' + grade + ' / ' + volume + '（用 grade=高一、grade=高二 或 grade=选必二）');
         }
         scope = seniorUrl[grade];
