@@ -972,8 +972,12 @@ def check_standards_file(std):
             last[key] = num
             if it.get("verbatim") is not False:
                 err("%s 高中%s课标必须显式标 verbatim:false（原文未逐页核对）" % (where, SENIOR3_LABEL[subj3]))
-            if it.get("page_or_ref") != "待核":
-                err("%s 高中%s课标 page_or_ref 必须是「待核」，不能编页码" % (where, SENIOR3_LABEL[subj3]))
+            ref = it.get("page_or_ref")
+            if ref != "待核":
+                if not (isinstance(ref, str) and re.match(r"^课标印刷页码 \d+(–\d+)?$", ref)):
+                    err("%s 高中%s课标 page_or_ref 必须是「待核」或「课标印刷页码 N」（跨页写 N–M）" % (where, SENIOR3_LABEL[subj3]))
+                if "2026-11-21" not in str(it.get("text_status") or ""):
+                    err("%s 高中%s课标 text_status 必须记下 2026-11-21 的核对" % (where, SENIOR3_LABEL[subj3]))
         elif phm:
             saw_physics_senior = True
             kind, vol, sec, num = phm.group(1), phm.group(2), phm.group(3), int(phm.group(4))
@@ -992,8 +996,12 @@ def check_standards_file(std):
             last[key] = num
             if it.get("verbatim") is not False:
                 err("%s 高中物理课标条目必须显式标 verbatim:false（出版社 PDF 文字层，未与纸本逐字核对）" % where)
-            if it.get("page_or_ref") != "待核":
-                err("%s 高中物理课标 page_or_ref 必须是「待核」，不能编页码" % where)
+            ref = it.get("page_or_ref")
+            if ref != "待核":
+                if not (isinstance(ref, str) and re.match(r"^课标印刷页码 \d+$", ref)):
+                    err("%s 高中物理课标 page_or_ref 必须是「待核」或「课标印刷页码 N」" % where)
+                if "2026-11-21" not in str(it.get("text_status") or ""):
+                    err("%s 高中物理课标 text_status 必须记下 2026-11-21 的核对" % where)
         elif pm:
             saw_physics = True
             if it.get("domain") != PHY_STD_TOPS[pm.group(1)]:
