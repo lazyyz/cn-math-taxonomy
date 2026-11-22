@@ -333,10 +333,10 @@
     const rs = await Promise.all(urls.map(function (u) { return fetch(u); }));
     rs.forEach(function (r, i) { if (!r.ok) throw new Error(urls[i] + ' → HTTP ' + r.status); });
     const js = await Promise.all(rs.map(function (r) { return r.json(); }));
-    // 题库可选：缺失（404）或损坏时回退到 topics.json 的 diagnostic_question
+    // 题库按学科分文件，只拉当前学科；缺失（404）或损坏时回退到 topics.json 的 diagnostic_question
     let questions = null;
     try {
-      const qr = await fetch('../data/questions.json');
+      const qr = await fetch('../data/questions/' + subject + '.json');
       if (qr.ok) questions = await qr.json();
     } catch (e) { questions = null; }
     const topics = js[0].filter(function (t) { return E.subjectOf(t) === subject; });
@@ -1330,6 +1330,7 @@
         h('a', { class: 'btn', id: 'btn-finals', href: '../finals/' + (subject !== 'math' ? '?subject=' + subject : ''), text: '生成我的 7 天补漏计划' }),
         h('button', { onclick: function () { if (confirm('重新开始会清除当前进度，确定吗？')) restart(); } }, '重新开始'),
         session.answers.length ? h('button', { onclick: function () { rebuild(session.answers.slice(0, -1)); } }, '撤销上一题') : null));
+    page.append(h('div', { class: 'cnm-nudge-slot no-print', 'data-nudge': 'diagnose' }));
     page.append(summaryCard);
     const blindCard = blindResultCard(sum);
     if (blindCard) page.append(blindCard);
