@@ -62,6 +62,9 @@ jobs:
       - name: 错题本存储测试
         run: node tests/test_wrongbook.js
 
+      - name: 错题到期复测测试
+        run: node tests/test_wrongbook_review.js
+
       - name: 期末补漏计划测试
         run: node tests/test_finals.js
 
@@ -70,6 +73,9 @@ jobs:
 
       - name: 账号与同步 API 测试
         run: node tests/test_api.js
+
+      - name: 每周学习周报测试
+        run: node tests/test_digest.js
 
       - name: 知识点静态页测试
         run: node tests/test_kp_pages.js
@@ -101,8 +107,23 @@ jobs:
       - name: 薄弱科目补强批回归（高中地理、生物、历史与历史先修边）
         run: node tests/test_senior_batch.js
 
+      - name: 英语每日一句：句子表与动画模板
+        run: node tests/test_english_data.js
+
+      - name: 英语每日一句：解锁、复习、打卡判定
+        run: node tests/test_english_logic.js
+
+      - name: 学习打卡与连续天数
+        run: node tests/test_activity.js
+
+      - name: 英语每日一句与学习打卡的云同步合并、打卡接入点
+        run: node tests/test_english_sync.js
+
       - name: 高中语文五册
         run: node tests/test_zh_hs.js
+
+      - name: 高中思想政治七册
+        run: node tests/test_pol_hs.js
 
       - name: 初中语文重建保留高中跨段边
         run: python3 tests/test_zhj_keep_hs.py

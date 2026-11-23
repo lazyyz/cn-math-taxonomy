@@ -4,10 +4,10 @@
   'use strict';
   var raw = location.hash.replace(/^#/, '');
   try { raw = decodeURIComponent(raw); } catch (e) { /* 保持原样 */ }
-  if (/^(?:cnm|cne|cnp|cnc|cns|cnd|cnh|cng|cnb|cnk)_[A-Za-z0-9]+$/.test(raw)) return;
+  if (/^(?:cnm|cne|cnp|cnc|cns|cnd|cnh|cng|cnb|cnk|cnz)_[A-Za-z0-9]+$/.test(raw)) return;
 
   var CN = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
-  var SUBJECT_KEYS = ['math', 'english', 'physics', 'chinese', 'science', 'morality', 'history', 'geography', 'biology', 'chemistry'];
+  var SUBJECT_KEYS = ['math', 'english', 'physics', 'chinese', 'science', 'morality', 'history', 'geography', 'biology', 'chemistry', 'politics'];
   var subjectParam = new URLSearchParams(location.search).get('subject');
   var subject = SUBJECT_KEYS.indexOf(subjectParam) >= 0 ? subjectParam : 'math';
   /* 非数学学科：页面标题、眉标、演示入口（年级用 diagnose 的册次写法）。数学是默认页，沿用 index.html 里的静态内容。 */
@@ -20,7 +20,8 @@
     history: { name: '历史', demo: '七上', demoText: '看演示：七年级上册历史' },
     geography: { name: '地理', demo: '七上', demoText: '看演示：七年级上册地理' },
     biology: { name: '生物', demo: '七上', demoText: '看演示：七年级上册生物' },
-    chemistry: { name: '化学', demo: '九上', demoText: '看演示：九年级上册化学' }
+    chemistry: { name: '化学', demo: '九上', demoText: '看演示：九年级上册化学' },
+    politics: { name: '思想政治', demo: '必修一', demoText: '看演示：必修一 中国特色社会主义' }
   };
 
   function $(id) { return document.getElementById(id); }
@@ -101,6 +102,73 @@
   }
 
   function fmt(n) { return Number(n).toLocaleString('en-US'); }
+
+  /* 「今日学习」卡：登录用户一张卡汇总当前孩子（站内 active child，没有则 guest 桶）——错题待复测、今日英语一句、
+   * 到期旧句复习、连续学习天数；没登录时，当前桶有英语 / 打卡进度也显示（游客版）。什么都没有就整张隐藏，不占位。
+   * 待复测数沿用第一批口径：全部孩子（含 guest）合计，分散在多个孩子名下时标「（全部孩子合计）」。 */
+  function loggedIn() {
+    try {
+      if (window.CnmAccount && window.CnmAccount.isLoggedIn) return !!window.CnmAccount.isLoggedIn();
+      var s = JSON.parse(localStorage.getItem('cnmAuth.v1'));
+      return !!(s && typeof s.token === 'string' && Number(s.exp) > Date.now());
+    } catch (e) { return false; }
+  }
+  function setHidden(id, hidden) {
+    var node = $(id);
+    if (node) node.hidden = !!hidden;
+  }
+  function currentBucket() {
+    try {
+      var cur = window.CnmChildren && window.CnmChildren.current && window.CnmChildren.current();
+      return cur && cur.id ? cur.id : 'guest';
+    } catch (e) { return 'guest'; }
+  }
+  function renderDueHome() {
+    var box = $('due-home');
+    if (!box) return;
+    var bucket = currentBucket();
+    var login = loggedIn();
+    var en = null, streak = 0, hasProgress = false;
+    try {
+      if (window.CnmEnglish && window.CnmEnglish.todayState) {
+        en = window.CnmEnglish.todayState(bucket, Date.now());
+        hasProgress = en.doneCount > 0;
+      }
+    } catch (e) { en = null; }
+    try {
+      if (window.CnmActivity && window.CnmActivity.streak) {
+        streak = window.CnmActivity.streak(bucket, Date.now());
+        if (window.CnmActivity.hasAny && window.CnmActivity.hasAny(bucket)) hasProgress = true;
+      }
+    } catch (e) { streak = 0; }
+    var show = login || hasProgress;
+    var n = 0, spread = false;
+    try {
+      if (show && window.CnmWrong && window.CnmWrong.dueTotal) {
+        n = window.CnmWrong.dueTotal(Date.now());
+        spread = n > 0 && !!window.CnmWrong.dueBuckets && window.CnmWrong.dueBuckets(Date.now()) > 1;
+      }
+    } catch (e) { n = 0; spread = false; }
+    if (n > 0) setText('due-home-n', String(n));
+    setHidden('due-home-all', !spread);
+    setHidden('due-home-line', !(n > 0));
+    setHidden('today-en-line', !en);
+    if (en) {
+      setText('today-en-state', en.finished ? '30 句已学完' : (en.completedToday ? '已完成' : '未学'));
+      var rn = en.reviewTotal || 0;
+      if (rn > 0) setText('today-en-review-n', String(rn));
+      setHidden('today-en-review', !(rn > 0));
+    }
+    if (streak > 0) setText('today-streak-n', String(streak));
+    setHidden('today-streak-line', !(streak > 0));
+    box.hidden = !show;
+  }
+  renderDueHome();
+  if (window.addEventListener) {
+    window.addEventListener('cnm:auth', renderDueHome);
+    window.addEventListener('cnm:sync', renderDueHome);
+    window.addEventListener('pageshow', renderDueHome);
+  }
 
   function fail(message) {
     var box = $('load-error');
@@ -189,7 +257,7 @@
   }
 
   var homeLoadToken = subject;
-  var PREFIX_SUBJECT = { cnm_: 'math', cne_: 'english', cnp_: 'physics', cnc_: 'chinese', cns_: 'science', cnd_: 'morality', cnh_: 'history', cng_: 'geography', cnb_: 'biology', cnk_: 'chemistry' };
+  var PREFIX_SUBJECT = { cnm_: 'math', cne_: 'english', cnp_: 'physics', cnc_: 'chinese', cns_: 'science', cnd_: 'morality', cnh_: 'history', cng_: 'geography', cnb_: 'biology', cnk_: 'chemistry', cnz_: 'politics' };
   function subjectOfId(id) {
     return PREFIX_SUBJECT[String(id || '').slice(0, 4)] || 'math';
   }
@@ -232,6 +300,7 @@
     var wantGeography = subject === 'geography';
     var wantBiology = subject === 'biology';
     var wantChemistry = subject === 'chemistry';
+    var wantPolitics = subject === 'politics';
     topics = topics.filter(function (topic) { return (topic.subject || subjectOfId(topic.id)) === subject; });
 
     var grades = $('grades');
@@ -257,8 +326,8 @@
       link.append(stage, name, count, split);
       grades.append(link);
     }
-    var from = wantPhysics ? 8 : (wantEnglish ? 3 : (wantChemistry ? 9 : (wantHistory || wantGeography || wantBiology ? 7 : 1)));
-    var to = wantPrimary ? 6 : (wantChemistry ? 9 : (wantGeography || wantBiology ? 8 : 9));
+    var from = wantPolitics ? 10 : (wantPhysics ? 8 : (wantEnglish ? 3 : (wantChemistry ? 9 : (wantHistory || wantGeography || wantBiology ? 7 : 1))));
+    var to = wantPolitics ? 9 : (wantPrimary ? 6 : (wantChemistry ? 9 : (wantGeography || wantBiology ? 8 : 9)));
     for (var g = from; g <= to; g++) {
       var list = topics.filter(function (topic) { return topic.grade === g; });
       var up = list.filter(function (topic) { return topic.semester === '上'; }).length;
@@ -295,6 +364,17 @@
       [10, 11, 12, 13, 14].forEach(function (g) {
         if (topics.some(function (topic) { return topic.grade === g; })) {
           addCard(g, srName, srWord[g], 'is-senior', srTitle[g], 'explore/?subject=' + subject + '&grade=' + g);
+        }
+      });
+    } else if (wantPolitics) {
+      var polWord = { 10: '必修一', 11: '必修二', 12: '必修三', 13: '必修四', 14: '选必一', 15: '选必二', 16: '选必三' };
+      var polTitle = {
+        10: '中国特色社会主义', 11: '经济与社会', 12: '政治与法治', 13: '哲学与文化',
+        14: '当代国际政治与经济', 15: '法律与生活', 16: '逻辑与思维'
+      };
+      [10, 11, 12, 13, 14, 15, 16].forEach(function (g) {
+        if (topics.some(function (topic) { return topic.grade === g; })) {
+          addCard(g, '高中思想政治', polWord[g], 'is-senior', polTitle[g], 'explore/?subject=politics&grade=' + g);
         }
       });
     } else if (wantChemistry) {

@@ -106,14 +106,13 @@ test('先修只连语文，高中点指向更早的点，且无环', () => {
   assert.strictEqual(byId.get('cnc_j013').name.indexOf('论语') >= 0, true);
 });
 
-test('高中课标待核，小学初中不引用它', () => {
+test('高中语文课标已对照课标 PDF，未对应的仍待核，小学初中不引用它', () => {
   const items = standards.items.filter((it) => String(it.id).startsWith('ccs-hs-2017:'));
   assert.strictEqual(items.length, 20);
   items.forEach((it) => {
     assert.strictEqual(it.verbatim, false);
-    assert.strictEqual(it.page_or_ref, '待核');
-    assert.match(it.text_status, /公开转述/);
-    assert.match(it.text_status, /未/);
+    assert.ok(it.page_or_ref === '待核' || /^课标印刷页码 \d+([–、]\d+)*$/.test(it.page_or_ref), it.id + ' ' + it.page_or_ref);
+    assert.match(it.text_status, /2026-11-22/);
   });
   const meta = standards.chinese_senior;
   assert.strictEqual(meta.title, '普通高中语文课程标准（2017年版）');
@@ -138,8 +137,9 @@ test('初中小学与地理生物历史高中点数不变', () => {
   assert.strictEqual(topics.filter((t) => String(t.id).startsWith('cng_h')).length, 119);
   assert.strictEqual(topics.filter((t) => String(t.id).startsWith('cnb_h')).length, 135);
   assert.strictEqual(topics.filter((t) => String(t.id).startsWith('cnh_h')).length, 120);
-  assert.strictEqual(topics.length, 4068);
-  assert.strictEqual(questions.length, 16419);
+  assert.strictEqual(topics.filter((t) => String(t.id).startsWith('cnz_h')).length, 153);
+  assert.strictEqual(topics.length, 4221);
+  assert.strictEqual(questions.length, 17031);
 });
 
 test('界面册次不用高一或必修一', () => {

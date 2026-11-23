@@ -1,5 +1,29 @@
 # 变更日志
 
+## 2026-11-23（每周学习周报，Worker，尚未部署）
+
+- 新增 `api/digest.js`：每周一 00:00 UTC（北京 08:00）cron 触发 `sendWeeklyDigests`，给 `mail_consent = 1` 且未退订的用户发一封服务邮件。内容只来自用户自己同步的数据：第一个孩子的名字、本周新增错题（`ts` 在近 7 天）、待复测数（`api/lib.js` 的 `computeDue`，与前端 `isDue` 同规则，老条目按 `ts` + 1 天）、已毕业总数、本周诊断次数（诊断记录的 `savedAt`）、进行中的期末补漏计划（计划日期 7 天内）。四项全 0 且没有进行中的计划就不发。主题「知识图谱周报：{孩子名}有 N 道错题待复测」，N 为 0 时「知识图谱周报：本周学习小结」；正文 HTML + 纯文本，一个「去错题本复测」按钮，页脚是服务邮件说明和退订链接，不提付费产品。
+- 防重复：`digest_log(user_id, week_key)`，`week_key` 为按 Asia/Shanghai 算的 ISO 周（如 2026-W48），发送前查、发送成功后写；单个用户失败只记日志，不中断整批。`mail.js` 的 `sendMail` 多一个可选的第四参数 `{ html, headers }`，验证码邮件不受影响。
+- 退订：`users.digest_token`（32 位随机十六进制，首次发送时生成）、`users.digest_opt_out`；`GET /digest/unsub?t=…` 置退订并返回中文确认页，token 不能用于登录 / 同步。邮件带 `List-Unsubscribe` 头。
+- 管理端点：`POST /admin/digest/run`，请求头 `X-Admin-Key` 等于 `ADMIN_KEY`（未设置一律 404），`?dry=1` 强制只算不发，返回候选人数、将发送数、跳过原因、每封的打码邮箱与各项计数。
+- `wrangler.toml`：`[triggers] crons = ["0 0 * * 1"]`，`DIGEST_DRY_RUN = "1"`（只有恰好是 `"0"` 才真发，其余一律只算不发、不写发送日志）。`schema.sql` 新增 `digest_log` 与 `users` 两列；已上线的库要先跑一次 `api/migrations/0001_digest.sql`（见 `wrangler.toml` 顶部的上线步骤）。
+- 新增 `tests/test_digest.js`，加入 CI 与 `npm test`。
+
+## 2026-11-23（错题到期复测）
+
+- 错题条目新增可选字段 `stage`（0–3）、`dueAt`（下次到期，毫秒）、`done`（已毕业），缺省按 stage 0、`ts` + 1 天、未毕业处理，老数据无需迁移。复测间隔 `INTERVALS_DAYS = [1, 3, 7, 15]`（`assets/wrongbook.js`；周报用的 `api/lib.js` 将存一份同值）。又答错：回到 stage 0、明天到期、清掉毕业标记；复测通过：stage + 1、按间隔排下一次，stage 3 通过即毕业；未过：stage 不变，明天再测。
+- `assets/wrongbook.js` 新增 `dueList(childId, now)`、`review(childId, qid, passed, now)`，以及首页用的 `dueTotal(now)`。`assets/sync.js` 的 `mergeWrongbook` 对同一 qid 的两份条目，复测进度单独取更靠前的一份（done 优先，其次 stage 高者，其次 dueAt 晚者），ts / count 等沿用原规则，旧副本不再冲掉复测进度。
+- 错题本页顶部新增「今日待复测」区（有到期题才显示）：选择题点选项即判对错，无选项的题先「显示答案」再自评「会了 / 还没会」；每条题目行带复测状态小字，已毕业的留在列表里。
+- 首页：已登录且本机合计有到期题时，三步流程之前显示一条「今日待复测 N 题 → 去复测」；未登录或没有到期题不显示、不占位。
+- 修：诊断演示模式结果页（及开始页、答题页）顶部多出的一行「null」——`childBar()` 在演示模式返回 null，被直接 `append`。
+- Service Worker 缓存版本 v37 → v38（缓存清单里的被改文件本来就在）。新增 `tests/test_wrongbook_review.js`，加入 CI 与 `npm test`；`tests/test_home.js` 补首页卡片用例。
+
+## 2026-11-22（高中思想政治）
+
+- 新增第 11 个学科「思想政治」，仅高中。统编版必修 1《中国特色社会主义》、必修 2《经济与社会》、必修 3《政治与法治》、必修 4《哲学与文化》，选择性必修 1《当代国际政治与经济》、2《法律与生活》、3《逻辑与思维》。编号 `cnz_h001`–`cnz_h153`，153 点，612 题，先修边 252 条（hard 168，soft 84，连到初中道德与法治 10 条）。课标 67 条 `czs-hs-2017:`，对象 `politics_senior`，2026-11-22 对照人教社转载课标 PDF 核对印刷页码，verbatim 仍为 false，无待核。目录说明见 `docs/politics-hs-catalog-20261122.md`。
+- 册次为 grade 10–16。首页学科胶囊和全站学科计数、诊断、知识图谱、错题本、期末补漏、知识点静态页都认这一学科。题库拆分新增 `data/questions/politics.json`。Service Worker 缓存版本 v36 → v37：思想政治题库按需加载，不预缓存。
+- 可复跑：`python3 scripts/pol_hs_build.py`，再 `python3 scripts/split_questions.py`。新增 `tests/test_pol_hs.js`，加入 CI 与 `npm test`。
+
 ## 2026-11-22（登录体验：显眼入口、提示条、价值时刻小卡、会话滚动续期）
 
 - 页头账号入口（首页、诊断、档案、错题本、期末补漏）改成实心主色胶囊，字号比导航大一档，旁带小字「登录后换手机不丢」；已登录时胶囊显示邮箱，旁边是同步状态（已同步 · N 分钟前 / 同步中 / 同步未成功）。
@@ -734,3 +758,137 @@
 ## 2026-10-17（第一版）
 
 - 生成初稿：289 个正式知识点、18 个小学外部节点、567 条先修边；九下章目为“（暂拟）”。
+
+## 2026-11-23（复查报告：粘性第一批 61a624b 复测 + 9879dd0 周报）
+
+复查者视角重读两个提交的全部改动与被改文件现状。修复提交：`566897f`（复测合并与首页口径）、`bc649d4`（周报并发与多孩子口径）。`npm test` 全绿。未部署、未推送，`DIGEST_DRY_RUN` 保持 `"1"` 未动。
+
+### 逐条结论
+
+1. **复测状态机（assets/wrongbook.js）——状态机本身没问题；一处同步合并有问题，已修（见 2）。**
+   - 新条目 stage 0 / dueAt = ts + 1 天 / done false；老条目无字段按 ts + 1 天到期；同题再答错回 stage 0、dueAt = 新 ts + 1 天、done 清掉、count + 1；stage 0→1→2→3 的下一次间隔依次 3 / 7 / 15 天，stage 3 通过毕业并清 dueAt；未过 stage 不变、明天再测；已毕业条目 review 不改动。边界（dueAt 恰等于 now 算到期）与 `api/lib.js` 的 `computeDue` 一致，`test_digest.js` 有同规则对拍。
+   - 数量一致性：错题本页 `dueList(childId)` 与首页 `dueTotal()` 用同一个 `isDue`，单孩子时数一致，只差「算两遍的时间点」。多孩子时口径不同，见 4。
+2. **同步合并：认同是真问题，已修（`566897f`）。** 原规则 done 优先，一台毕业、另一台之后又答错回炉，合并后回炉被盖成「已毕业」，count / ts 是回炉的、进度却是毕业的；同理，较新一次「没过」复测（dueAt 更早）会被另一台 dueAt 更晚的旧进度盖掉。做法：条目加 `reviewedAt`（`record` 取 ts，`review` 取 now，未过也更新，已毕业的 no-op 不动）；`progressCmp` 在两边都带 `reviewedAt` 且不同时较新者胜，其余（老副本没有 reviewedAt、或相同）仍按 done > stage > dueAt。ts / count / chosen 的 pickNewer 规则不变。新增测试锁住：毕业后另一台回炉不被盖（两个方向）、旧副本（含 stage 更高 / 已毕业）不覆盖新进度、较新的未过复测不被盖、无 reviewedAt 的老副本与一边有一边没有时行为不变。
+3. **周报 Worker（api/）**
+   - 收件筛选：严格 `mail_consent = 1 AND COALESCE(digest_opt_out, 0) = 0`，营销同意与否无关——没问题（测试覆盖）。
+   - week_key：`isoWeekKey` 先 +8 小时再取日历日，周一 00:00 UTC（上海 08:00）落在当周；我另用 `Intl`（Asia/Shanghai）独立实现对拍 2019–2032 每 5 小时一个点共 22791 个，0 个不一致——没问题。
+   - 并发重复：**有问题，已修（`bc649d4`）。** 原来先查 `digest_log`、发送成功后才写，cron 与手动 `/admin/digest/run` 同时跑，或同一用户在两个并发请求里，会各发一封（新增测试先红：每人两封）。改为发送前 `INSERT OR IGNORE` 占位、`meta.changes < 1` 就跳过（计入 already_sent），发送失败或 `MAIL_DRY_RUN` 未真发时 `DELETE` 释放占位。代价：进程恰好死在占位之后、发送之前，该用户本周漏发一封（宁漏勿重）。
+   - 单个用户数据损坏：`parseData` 捕获 JSON 解析失败当没有数据，用户级处理有 try/catch，一人失败不拖垮整批；整页 `sync_data` 查询失败也只记该页失败后继续——没问题。
+   - 67 人量级：逐页（50 人）批量查 `sync_data`，不是逐人查；但每个发送用户还有 占位 1 次 + 首次生成 token 2 次（UPDATE + SELECT）+ 1 次发信 fetch。我用 67 个用户、桩发信实测：D1 查询 206 次 + 发信 67 次，共约 273 次子请求；dry-run 只有 5 次。**Workers 免费版单次调用子请求上限 50，付费版 1000：若线上是免费版，真发会在约 12 封后撞限。需要上级确认 Cloudflare 套餐**；撞限时已占位未发的用户若连释放占位也失败，会漏发当周（日志有 `release claim failed`）。未改：确认是付费版就不必动，免费版需要另行设计（分批多次触发或改批量发信）。
+   - 退订 token：`crypto.getRandomValues` 16 字节 = 128 位十六进制，不可猜；单独存 `users.digest_token`，只被 `/digest/unsub` 使用，测试确认拿它调 `/auth/me`、`/sync` 都是 401，不与会话 / 验证码混用——没问题。
+   - `/admin/digest/run`：`ADMIN_KEY` 未设（含空串）时先于方法与密钥判断直接 404，任何方法都是——没问题；密钥错 401，GET 405。
+   - HTML 转义：孩子名、标签、数字、退订链接都过 `escapeHtml`，测试用 `<b>小明</b>` 验证；孩子名另去控制字符、截 12 字——没问题。
+   - 日志明文邮箱：`digest.js` 与 cron 汇总日志只有用户 id 与计数，admin 返回体邮箱已打码——没问题。唯一例外是 `mail.js` 既有的 `MAIL_DRY_RUN=1` 调试日志会写明文收件人、正文与退订链接，生产为 `"0"`，保持现状。
+   - 另一处同源问题已修（`bc649d4`）：待复测数是全部孩子（含 guest 桶）合计，主题却写「{第一个孩子名}有 N 道错题待复测」，多孩子家庭会把兄弟姐妹的错题算到第一个孩子头上。现在只有恰好一个孩子档案时才带名字，多个孩子时主题为「知识图谱周报：有 N 道错题待复测」、问候语不带名字。这改的是原设计「第一个孩子的名字」，若上级倾向保留可单独回退该处。
+4. **首页复测卡（assets/home.js）：** 未登录或到期数 0 时 `hidden`，不渲染不占位（测试覆盖，含无 CnmWrong 脚本时不报错）——没问题。多孩子口径：**有问题，已修（`566897f`）**——首页是全部孩子合计，错题本页只显示当前孩子，两边数字可能对不上而文案没说明。新增 `CnmWrong.dueBuckets(now)`（有到期题的桶数），到期题分在多个孩子名下时卡片后缀「（全部孩子合计）」，单个孩子不显示。
+5. **sw.js v38：没问题。** 61a624b 改动的 `home.js`、`site.css`、`sync.js`、`wrongbook.js`、`diagnose/app.js`、`index.html`、`wrongbook/wrongbook.js`、`wrongbook/wrongbook.css` 都在 SHELL 里；版本 v37→v38 只升一版；SW 只处理同源 GET，`api.math.pansgo.com` 的响应不缓存也不在清单里；9879dd0 没改任何被缓存文件。复查修复后又改了 `assets/wrongbook.js` / `sync.js` / `home.js` / `index.html`，脚本与页面走网络优先，未再升版本，以免 v38 若尚未上线时多升一版；如果 v38 已经发出，部署时需由上级决定是否升 v39。
+6. **diagnose demo 的 null：没问题，真修对了。** `childBar()` 在演示模式 `return null`，开始页 / 答题页 / 结果页三处都改成 `const bar = childBar(...); if (bar) page.append(bar)`；`h()` 本身会跳过 null 子节点，其余 `page.append(...)` 的来源（`blindStartCard`、`excludedNote` 等）本就判空，`wrongbookLink()` 在 `h()` 里；正常模式 `childBar` 恒返回元素。已有静态测试锁住三处判空与「不得直接 append(childBar(...))」。
+
+### 没修的及理由
+
+- 退订链接是 GET：邮件安全网关预取链接可能误退订。属行业通行做法，改成确认页 / One-Click POST 属于功能改动，留给上级裁决。
+- `sync_data` 单页 50 人一次全载入内存：单条上限由同步接口限制，67 人量级远低于 Worker 内存上限，规模上去后再说。
+- 手动在周日触发会占掉上一周的 week_key，周一 cron 因换周会再发一次；只在手动真发时可能出现，当前 dry-run 阶段不影响。
+
+## 2026-11-23（第二批：英语「每日一句」并入本站，30 天起步）
+
+按 `~/english-daily-brief.md` 实现。只在本地提交，未部署、未推送，`DIGEST_DRY_RUN` 保持 `"1"` 未动。`npm test` 全绿（新增 5 个测试文件并入 npm test 与 CI；另有一个不进 CI 的浏览器端到端脚本）。
+
+### 提交
+
+| 哈希 | 内容 |
+|---|---|
+| `2e8b1d2` | 30 天句子表 `data/english/days.json`、`assets/english.js`（进度与解锁 / 复习规则）、`assets/activity.js`（学习打卡）、`english/scenes.js`（动画模板）、三个测试 |
+| `ef96125` | `/english/` 页面（index.html / app.js / style.css）、sw 缓存清单、`scripts/deploy-cf.sh` 发布清单、CI 步骤、浏览器端到端脚本 |
+| `a35f50a` | `sync.js` 新增 english / activity 两个数据集及合并规则，`api/lib.js` 放行白名单，错题复测与诊断完成接入打卡，同步测试 |
+| `fb3cfda` | 首页「今日学习」卡 + 学科区下方的英语入口，周报英语行，首页与周报测试 |
+
+### 第 8–30 天句子表（第 1–7 天按简报照抄）
+
+| 天 | 句子 | 意译 | 模板 | sceneProps |
+|---|---|---|---|---|
+| 8 | I am hungry. | 我饿了。 | emotion | mood=hungry |
+| 9 | I want an apple. | 我想要一个苹果。 | eat | food=apple, mode=want |
+| 10 | I eat an apple. | 我吃一个苹果。 | eat | food=apple, mode=eat |
+| 11 | I have a dog. | 我有一只狗。 | show | items=[dog], mode=have |
+| 12 | I can run. | 我会跑。 | run | — |
+| 13 | I can sing. | 我会唱歌。 | sing | — |
+| 14 | This is my mom. | 这是我妈妈。 | family | who=mom |
+| 15 | I like my mom. | 我喜欢我妈妈。 | family | who=mom, mode=like |
+| 16 | I sleep every night. | 我每晚睡觉。 | sleep | — |
+| 17 | I can sing a song. | 我会唱一首歌。 | sing | extra=song |
+| 18 | It is sunny. | 今天天气晴朗。 | weather | kind=sunny |
+| 19 | It is rainy. | 今天在下雨。 | weather | kind=rainy |
+| 20 | I am sleepy. | 我困了。 | emotion | mood=sleepy |
+| 21 | I like milk and cake. | 我喜欢牛奶和蛋糕。 | eat | food=milk, food2=cake, mode=like |
+| 22 | I like cats and dogs. | 我喜欢猫和狗。 | show | items=[cat, dog], mode=like |
+| 23 | I read a book at night. | 我晚上读一本书。 | read | when=night, item=book |
+| 24 | I swim in the sun. | 我在阳光下游泳。 | swim | sun=true |
+| 25 | It is rainy at night. | 晚上下雨。 | weather | kind=rainy, night=true |
+| 26 | I want to swim. | 我想去游泳。 | swim | mode=want |
+| 27 | I am happy at home. | 我在家很开心。 | emotion | mood=happy, place=home |
+| 28 | I have a cat at home. | 我家里有一只猫。 | show | items=[cat], mode=have, place=home |
+| 29 | I like my mom and dad. | 我喜欢我的爸爸妈妈。 | family | who=[mom, dad], mode=like |
+| 30 | I like my family. | 我喜欢我的家人。 | family | who=all, mode=like |
+
+约束核对（`tests/test_english_data.js` 锁住）：每句 3–6 词；`words` 逐词覆盖全句、每词有中文；每句 3 个换词变体，只换一个词，且同一句的变体换的是同一个位置（页面据此做「换词造句」的空位）；`and / in / at / the / to` 等小词只在第 21–30 天出现；每句都带预留的 `audio: null`。前 20 天只用 be / have / like / can / want / 基础动词；难度从「I am X」逐步到带 and / 地点短语的句子。
+
+### 模板清单（10 个，`english/scenes.js`，CSS / SVG 动画，`prefers-reduced-motion` 下不播放）
+
+| 模板 | 用于第几天 |
+|---|---|
+| emotion（表情：happy / hungry / sleepy，可加房子） | 1, 8, 20, 27 |
+| show（指物展示：小人指着道具，like 时飘爱心） | 2, 11, 22, 28 |
+| eat（吃喝：eat 咀嚼 / want 想法泡泡 / like 爱心） | 3, 9, 10, 21 |
+| swim（游泳，含岸边想去游泳、太阳） | 4, 24, 26 |
+| family（家人，指着妈妈 / 爸爸 / 全家） | 5, 14, 15, 29, 30 |
+| read（白天 / 夜晚读书，story 加星星） | 6, 7, 23 |
+| run（跑步） | 12 |
+| sing（唱歌，song 音符更多） | 13, 17 |
+| sleep（夜晚睡觉） | 16 |
+| weather（晴天 / 雨天 / 雨夜） | 18, 19, 25 |
+
+道具图 7 个：apple、milk、cake、cat、dog、book、story。固定简笔小人只有一套（中性配色，妈妈 / 爸爸只靠发型与裙子区分）。
+
+### 产品口径落地
+
+- **每日闭环**：听（常速 / 慢速，逐词高亮）→ 动画猜意思 → 三层翻译折叠（逐词对照 / 字面连读 / 整句意译，词与译词同色）→ 拆词发音 → 跟读（可选，不进打卡）→ 词卡排序 → 换词造句 → 三项打卡（翻开任一层翻译即勾「猜出意思」、排对即勾、换了一个词即勾「造句」）→ 全满才能点完成。
+- **解锁**：下一句 = 最小的未学 day；一个自然日（本地时区）只能完成 1 句，学完当天显示完成卡与明日预告，30 句学完显示完成态与「敬请期待下一阶段」。
+- **复习**：完成序号 n0 的句子在学到第 n0+2、n0+4、n0+7、n0+15 句那天各回炉一次（`reviews[day] = {dueOrd, doneOrds}`），形式为词卡排序 + 听写，不占新句名额；做完一轮 `dueOrd` 顺延，四轮后 `dueOrd=null` 不再到期。一天最多列 5 条。
+- **朗读**：`speechSynthesis`（优先 en-US），有 `boundary` 事件按事件推进高亮，没有就按词长估算；浏览器没有朗读时给文字提示、仍做高亮，流程不被挡住；听写在无语音时改成凭动画记忆写。`audio` 字段只在数据层预留，页面本批不读。
+- **孩子**：复用档案；有档案时顶部选孩子，没档案用 guest 桶，guest 有进度时选单里多一项「未建档时学的」。
+
+### activity 接入点（`cnmActivity.v1`）
+
+1. **每日一句完成**：`assets/english.js` 的 `completeDay` 成功写入进度后调用 `CnmActivity.mark`（任何调用方都会打卡；复习不打卡）。
+2. **错题复测通过**：`wrongbook/wrongbook.js` 的 `doReview`，`CW.review` 成功且 `passed` 时 mark（含 guest 桶）。
+3. **诊断完成**：`diagnose/app.js` 的 `saveToChild`——这是现成的「做完一次诊断」落点。只在该孩子**首次存下这条诊断记录**（`CC.hasRecord` 为假）时 mark，所以重新打开已存的结果页、换孩子重渲染都不会重复打卡。**没有接入的情形**：演示模式、没有选孩子档案（诊断记录本身也不存）、一题没答的诊断——这些不 mark。没有用 `renderResult` 当回调，是因为它在「继续未清除的存档」时也会跑，会把几天前已完成的诊断记成今天。
+
+`tests/test_english_sync.js` 用静态断言锁住这三处接入与四个页面引入了 `assets/activity.js`。
+
+### 同步
+
+`sync.js` 数据集由 4 个增至 6 个（`english`=`cnmEnglish.v1`、`activity`=`cnmActivity.v1`），`api/lib.js` 的 `DATASETS` 白名单同步放行（worker 只靠 `isDataset`，不需另改；D1 表无需迁移，`sync_data` 的 dataset 是自由文本）。合并规则：english 的 `done` 按 day 取并集、同一天取 `at` 晚者（相同取本地）；`reviews` 按 day 取并集，`doneOrds` 取并集，下一轮 `dueOrd` 按合并后做过的轮数与 n0 重算；activity 日期取并集去重排序。两者都不做删除推断。测试覆盖纯合并函数和两台设备经假云端的完整同步流程。
+
+### 首页与周报
+
+- 首页 `#due-home` 由一行链接升级为「今日学习」卡：待复测 N 题（沿用第一批口径——全部孩子合计，分散在多个孩子名下时标「（全部孩子合计）」，没有改成当前孩子口径）、今日英语一句（未学 / 已完成 / 30 句已学完）、到期旧句复习 M 句、连续学习 S 天；英语与连续天数取站内当前孩子（`CnmChildren.current()`，没有则 guest）。登录用户卡常在；未登录时当前桶有英语或打卡进度才显示游客版。学科区下方加全访客可见的「英语每日一句 · 每天 3 分钟 →」。数字条、学科胶囊、登录入口、统计埋点、页脚友链都没动，`test_home.js` 里加了静态核对。第一批的两条首页测试随之改了断言：登录用户没有到期题时卡片仍在、只隐藏待复测一行。
+- 周报：`summarizeUser` 多算 `english = {week, total, streak}`，正文加一行「英语每日一句：本周学了 N 句，连续学习 S 天」。`week` 是最近 7 天完成的新句数（与前端 `weekStats` 同口径，各孩子 / guest 桶相加）；`streak` 取各桶中最长的当前连续段，以发送日的 Asia/Shanghai 日期为锚（当天没打卡就从前一天数，所以周一早上周日打过卡仍连着）。有英语数据才加这一行；**只有英语也可发**，但只有「本周学过或仍在连续打卡」才算有内容——学完很久且没在打卡的账号仍按没内容跳过，免得每周发空小结（若上级想放宽成「有过英语数据就发」，改 `digest.js` 的 `englishFresh` 一处即可）。原有四项与跳过规则、`items` 字段形状不变（仅在有英语数据时多两个字段）。
+
+### 测试
+
+- 新增并入 npm test 与 CI：`test_english_data.js`（8 项）、`test_english_logic.js`（13 项）、`test_activity.js`（7 项）、`test_english_sync.js`（8 项）；`test_digest.js` 新增 5 项（含「只有英语的用户不被跳过、正文含英语行」）；`test_home.js` 改 2 项、新增 3 项；`test_api.js` 的数据集清单断言加了两项。
+- `tests/test_english_browser.js`：真实 Chrome 走完整的一天（翻开翻译、排序、造句、完成、刷新仍是完成态、过一天解锁第 2 句、复习排序 + 听写、首页卡片），10 项通过。同 `test_children_browser.js`，需要本机 Chrome，不进 CI / npm test。
+- 最终 `npm test` 退出码 0，`VALIDATION PASSED`、`VERIFICATION PASSED`。
+
+### 需要上级知道的
+
+- **sw 版本没有再升**：HEAD 已是 `v39`（上一批复查提交升的），且 `test_questions_split.js` 固定断言 `v39`；本批新增的 `english/*`、`assets/english.js`、`assets/activity.js`、`data/english/days.json` 都加进了 v39 的清单。若 v39 已经部署过，需要另升一版并同步改那条断言。
+- **部署清单**：`scripts/deploy-cf.sh` 已加 `english/` 与 `data/english/`；不加的话页面会 404。
+- **已知局限**：复习按完成序号计，30 句学完后序号不再增长，所以第 16–30 句的第 7、15 次回炉可能永远排不到；学完后的巩固留给下一阶段。动画和 TTS 在真实手机浏览器 / 有真实语音的环境下只在桌面 Chrome 里看过静态帧与流程，iOS Safari 的语音与 `boundary` 事件行为未实测。
+- 未做：分年级（二期）、录制音频、sitemap 收录 `/english/`（`test_kp_pages.js` 固定了 sitemap 条数，没有顺手改）。
+
+### 复核修正（2026-11-23）
+
+- **复习尾部已修**：30 句学完后，`todayState` 按「学完后每过一个自然日、序号视同 +1」推进，第 16–30 句的第 7、15 天回炉仍能按期出现（第 30 句第 4 轮在学完后第 15 天到期）。`test_english_logic.js` 加一例覆盖。上面「已知局限」里「第 16–30 句的第 7、15 次回炉可能永远排不到」一条作废。
+- **sw 升 v40**：v39 已在线上，缓存清单变了必须换版才能推给老用户；`sw.js` VERSION v39→v40，`test_questions_split.js` 断言同步改到 v40。
